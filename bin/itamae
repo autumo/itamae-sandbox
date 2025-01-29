@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'thor'
+require 'open3'
+
+module Itamae
+  class Command
+    def initialize(hostname:, dry_run:, user:, identify:, role:, port:)
+      @hostname = hostname
+      @role = role
+      @dry_run = dry_run
+      @user = user
+      @identify = identify
+      @port = port
+    end
+
+    def run
+      puts command.join(' ')
+      exec(*command)
+    end
+
+    private
+
+    def command
+      [
+        "itamae",
+        "ssh", "-h", @hostname, "-i", @identify, "-p", @port,
+        "-u", @user,
+        "roles/#{@role}/default.rb",
+      ].tap do |command|
+        command << "--dry-run" if @dry_run
+      end
+    end
+  end
+
+  class WrapperCLI < Thor
+    desc 'apply [hostname]', 'apply to a host'
+    option 'dry-run', type: :boolean, default: false
+    option 'user', type: :string, default: 'ec2-user'
+    option 'role', type: :string
+    option 'identify', type: :string, default: '~/.ssh/id_ed25519'
+    option 'port', type: :string, default: '22'
+    def apply(hostname)
+      Command.new(
+        hostname: hostname,
+        dry_run: options[:'dry-run'],
+        user: options[:user],
+        role: options[:role],
+        identify: options[:identify],
+        port: options[:port],
+      ).run
+    end
+  end
+end
+
+Itamae::WrapperCLI.start(ARGV)
